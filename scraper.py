@@ -6,31 +6,26 @@ import os
 import json
 import time
 
-# 1. الإعدادات - بدّل هاد بالـ ID تبع شيتك
+# 1. الإعدادات
 SHEET_ID = '1BwKw3oMkXvkuLRIDDwal58Mv5ilia7zgrwiltECWxkw'
+BASE_URL = 'https://halalo.co.uk'
+CATEGORY_URL = f'{BASE_URL}/index.php?dispatch=companies.view&company_id=3&scroller_id=category_1127'
 
-# 2. تجهيز الاتصال بـ Google Sheets
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+}
+
+# 2. تجهيز Google Sheets
 scope = [
     'https://spreadsheets.google.com/feeds',
     'https://www.googleapis.com/auth/drive'
 ]
 
-# بجيب الـ credentials من GitHub Secrets
 creds_json = os.environ['GDRIVE_CREDS']
 creds_dict = json.loads(creds_json)
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
-
-# بفتح الشيت بالـ ID - أضمن من الاسم
 sheet = client.open_by_key(SHEET_ID).sheet1
-
-# 3. سكراب المنتجات من Halalo
-BASE_URL = 'https://halalo.co.uk'
-COLLECTION_URL = f'{BASE_URL}/collections/madinah-online'
-
-headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-}
 
 def get_all_product_links():
     """بجيب كل روابط المنتجات من كل الصفحات"""
@@ -38,8 +33,13 @@ def get_all_product_links():
     page = 1
 
     while True:
-        url = f'{COLLECTION_URL}?page={page}'
-        print(f'Checking page {page}...')
+        # الرابط مع pagination الصح
+        if page == 1:
+            url = CATEGORY_URL
+        else:
+            url = f'{CATEGORY_URL}&page={page}'
+
+        print(f'Checking page {page}... {url}')
 
         try:
             res = requests.get(url, headers=headers, timeout=15)
@@ -49,20 +49,24 @@ def get_all_product_links():
             break
 
         soup = BeautifulSoup(res.text, 'lxml')
-        products = soup.select('a.product-item__title')
+
+        # السيلكتور الصح لمنتجات Halalo
+        products = soup.select('a.product-title')
 
         if not products:
             print('No more products found.')
             break
 
         for product in products:
-            link = BASE_URL + product['href']
+            link = product['href']
+            if not link.startswith('http'):
+                link = BASE_URL + '/' + link.lstrip('/')
             all_links.append(link)
 
         page += 1
-        time.sleep(1) # عشان ما نضغط ع السيرفر
+        time.sleep(1)
 
-    return list(set(all_links)) # بحذف التكرار
+    return list(set(all_links))
 
 def scrape_product(url):
     """بجيب تفاصيل منتج واحد"""
@@ -72,20 +76,20 @@ def scrape_product(url):
         soup = BeautifulSoup(res.text, 'lxml')
 
         # اسم المنتج
-        name = soup.select_one('h1.product-meta__title')
+        name = soup.select_one('h1[itemprop="name"]')
         name = name.text.strip() if name else 'N/A'
 
         # السعر
-        price = soup.select_one('span.price')
-        price = price.text.strip().replace('\n', '') if price else 'N/A'
+        price = soup.select_one('span.ty-price[id*="price"]')
+        price = price.text.strip() if price else 'N/A'
 
         # SKU
-        sku = soup.select_one('span.product-meta__sku')
-        sku = sku.text.strip().replace('SKU:', '').strip() if sku else 'N/A'
+        sku = soup.select_one('div.ty-product-block__sku span[id*="product_code"]')
+        sku = sku.text.strip() if sku else 'N/A'
 
         # الصورة
-        img = soup.select_one('img.product-gallery__image')
-        img_url = 'https:' + img['src'] if img and img.get('src') else 'N/A'
+        img = soup.select_one('a.cm-image-viewer img')
+        img_url = img['src'] if img and img.get('src') else 'N/A'
 
         return [name, price, sku, img_url, url]
 
@@ -110,10 +114,10 @@ print(f'\nTotal products scraped: {len(scraped_data)}')
 
 # 5. رفع البيانات على Google Sheets
 print('Updating Google Sheet...')
-sheet.clear() # بمسح الشيت القديم
-sheet.append_row(['Name', 'Price', 'SKU', 'Image URL', 'Product URL']) # الهيدر
+sheet.clear()
+sheet.append_row(['Name', 'Price', 'SKU', 'Image URL', 'Product URL'])
 
 if scraped_data:
-    sheet.append_rows(scraped_data) # بضيف كل المنتجات مرة وحدة - أسرع
+    sheet.append_rows(scraped_data)
 
 print(f'✅ Done! Updated Google Sheet with {len(scraped_data)} products')
