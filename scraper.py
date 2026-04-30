@@ -75,27 +75,74 @@ def scrape_product(url):
         res.raise_for_status()
         soup = BeautifulSoup(res.text, 'lxml')
 
-        # اسم المنتج
-        name = soup.select_one('h1[itemprop="name"]')
+        # اسم المنتج - جرب 3 احتمالات
+        name = soup.select_one('h1.ty-product-block-title')
+        if not name:
+            name = soup.select_one('h1[itemprop="name"]')
+        if not name:
+            name = soup.select_one('.ty-product-block__title h1')
         name = name.text.strip() if name else 'N/A'
 
-        # السعر
-        price = soup.select_one('span.ty-price[id*="price"]')
+        # السعر - CS-Cart بستخدم ty-price-num
+        price = soup.select_one('span.ty-price-num')
+        if not price:
+            price = soup.select_one('span[id*="sec_discounted_price"]')
+        if not price:
+            price = soup.select_one('.ty-price')
         price = price.text.strip() if price else 'N/A'
 
-        # SKU
-        sku = soup.select_one('div.ty-product-block__sku span[id*="product_code"]')
+        # SKU / Product Code
+        sku = soup.select_one('span.ty-product-block__sku-code')
+        if not sku:
+            sku = soup.select_one('span[id*="product_code"]')
+        if not sku:
+            sku = soup.select_one('.ty-control-group:contains("SKU") .ty-control-group__item')
         sku = sku.text.strip() if sku else 'N/A'
 
-        # الصورة
-        img = soup.select_one('a.cm-image-viewer img')
-        img_url = img['src'] if img and img.get('src') else 'N/A'
+        # الصورة الرئيسية
+        img = soup.select_one('img.ty-pict[id*="det_img"]')
+        if not img:
+            img = soup.select_one('.ty-product-img img')
+        if not img:
+            img = soup.select_one('a.cm-image-previewer img')
+        
+        if img and img.get('src'):
+            img_url = img['src']
+            if not img_url.startswith('http'):
+                img_url = BASE_URL + img_url
+        else:
+            img_url = 'N/A'
 
         return [name, price, sku, img_url, url]
 
     except Exception as e:
         print(f'Error scraping {url}: {e}')
         return None
+
+45 lines hidden
+لو لسا بجيب N/A، ضيف debug عشان نشوف الـ HTML:
+حط هاد الكود داخل scrape_product بعد سطر soup = BeautifulSoup... عشان نطبع أول منتج ونشوف السيلكتورز:
+
+Python
+# احذف هاي الأسطر بعد ما تزبط
+if 'beef-knuckle' in url:
+    print("=== DEBUG HTML ===")
+    print(soup.select_one('h1'))
+    print(soup.select_one('span.ty-price'))
+    print(soup.select_one('span[id*="product_code"]'))
+    print("=== END DEBUG ===")
+
+2 lines hidden
+شو تعمل هسا:
+
+استبدل دالة scrape_product كاملة بالكود الأول اللي فوق
+اعمل Commit → Run workflow
+افتح الشيت - لازم تشوف الاسم والسعر والـ SKU والصورة كلهم موجودين
+السعر رح يطلع بـ £ زي £7.34. لو بدك إياه رقم بس بدون £ قولي بعدلك إياها.
+
+جرّب وخبرني شو طلع بالشيت.
+
+
 
 # 4. تشغيل السكريبت
 print('Starting scrape from Halalo...')
