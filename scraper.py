@@ -48,58 +48,38 @@ def get_all_product_links():
         time.sleep(1)
     return list(set(all_links))
 
-def scrape_product(url, debug=False):
+def scrape_product(url):
     try:
         res = requests.get(url, headers=headers, timeout=15)
         res.raise_for_status()
         soup = BeautifulSoup(res.text, 'lxml')
 
-        # --- DEBUG: بطبع أول منتج عشان نشوف السيلكتورز ---
-        if debug:
-            print("\n=== DEBUG: HTML for first product ===")
-            print("H1:", soup.select_one('h1'))
-            print("Price spans:", soup.select('span[class*="price"]')[:3])
-            print("SKU spans:", soup.select('span[id*="product_code"]'))
-            print("Images:", soup.select('img[class*="ty-pict"]')[:2])
-            print("=== END DEBUG ===\n")
-
-        # 1. اسم المنتج
-        name = soup.find('h1')
+        # 1. الاسم - شغال تمام
+        name = soup.select_one('h1.ty-product-bigpicture__right-title')
         name = name.text.strip() if name else 'N/A'
 
-        # 2. السعر - بجرب كل الاحتمالات
-        price = None
-        for sel in ['span.ty-price-num', 'span[id*="sec_discounted_price"]', 'span[id*="price"]', '.ty-price']:
-            price = soup.select_one(sel)
-            if price:
-                price = price.text.strip()
-                break
-        if not price:
+        # 2. السعر - بجمع الـ £ مع الرقم
+        price_container = soup.select_one('span.ty-price[id*="line_discounted_price"]')
+        if price_container:
+            price_parts = price_container.select('span.ty-price-num')
+            price = ''.join([p.text.strip() for p in price_parts])
+        else:
             price = 'N/A'
-        if price!= 'N/A' and '£' not in price:
-            price = '£' + price
 
-        # 3. SKU
-        sku = None
-        for sel in ['span.ty-product-block__sku-code', 'span[id*="product_code"]', '.ty-control-group:contains("SKU") span']:
-            sku = soup.select_one(sel)
-            if sku:
-                sku = sku.text.strip()
-                break
-        if not sku:
-            sku = 'N/A'
+        # 3. SKU - مش موجود بالموقع هذا
+        sku = 'N/A'
 
-        # 4. الصورة
-        img = None
-        for sel in ['img.ty-pict[id*="det_img"]', 'a.cm-image-previewer img', '.ty-product-img img']:
-            img = soup.select_one(sel)
-            if img and img.get('src'):
-                img_url = img['src']
+        # 4. صورة المنتج الرئيسية - بفلتر اللوجو
+        img_url = 'N/A'
+        img_tags = soup.select('div.ty-product-img img, a.cm-image-previewer img')
+        for img in img_tags:
+            src = img.get('src', '')
+            # بتخطى اللوجوهات
+            if 'logo' not in src.lower() and 'al_bayder' not in src.lower():
+                img_url = src
                 if not img_url.startswith('http'):
                     img_url = BASE_URL + img_url
                 break
-        if not img:
-            img_url = 'N/A'
 
         return [name, price, sku, img_url, url]
 
@@ -113,11 +93,10 @@ print(f'Found {len(product_links)} products on site')
 
 scraped_data = []
 for i, link in enumerate(product_links, 1):
-    # بطبع Debug لأول منتج بس
-    data = scrape_product(link, debug=(i==1))
+    data = scrape_product(link)
     if data:
         scraped_data.append(data)
-        print(f'Scraped {i}/{len(product_links)}: {data[0]} | {data[1]} | {data[2]}')
+        print(f'Scraped {i}/{len(product_links)}: {data[0]} | {data[1]}')
     time.sleep(0.5)
 
 print(f'\nTotal products scraped: {len(scraped_data)}')
