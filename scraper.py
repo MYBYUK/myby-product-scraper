@@ -7,7 +7,7 @@ import json
 import time
 
 # 1. الإعدادات - بدّل هاد بالـ ID تبع شيتك
-SHEET_ID = '/d/1BwKw3oMkXvkuLRIDDwal58Mv5ilia7zgrwiltECWxkw/edit?gid=0#gid=0' # مثال: 1AbCDeFgHiJkLmNoPqRsTuVwXyZ
+SHEET_ID = '1BwKw3oMkXvkuLRIDDwal58Mv5ilia7zgrwiltECWxkw'
 
 # 2. تجهيز الاتصال بـ Google Sheets
 scope = [
