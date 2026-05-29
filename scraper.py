@@ -7,7 +7,7 @@ import json
 import time
 
 # ===== الإعدادات =====
-SHEET_ID = os.environ['SHEET_ID']
+SHEET_ID = os.environ.get('SHEET_ID', '1BwKw3oMkXvkuLRIDDwal58Mv5ilia7zgrwiltECWxkw')
 BASE_URL = 'https://halalo.co.uk'
 
 CATEGORIES = [
