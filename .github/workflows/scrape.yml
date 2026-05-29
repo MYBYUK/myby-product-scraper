@@ -2,28 +2,38 @@ name: Scrape Halalo Products Daily
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # كل يوم الساعة 6 صباحاً UTC = 7 صباحاً بتوقيت لندن
-  workflow_dispatch:  # بخليك تشغله يدوي من GitHub بكبسة زر
+    - cron: '0 6 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 30
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Install dependencies
         run: |
           pip install requests beautifulsoup4 gspread oauth2client lxml
-      
+
       - name: Run scraper
         env:
           GDRIVE_CREDS: ${{ secrets.GDRIVE_CREDS }}
           SHEET_NAME: ${{ secrets.SHEET_NAME }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
         run: python scraper.py
+
+      - name: Report success
+        if: success()
+        run: echo "✅ Scraper finished successfully!"
+
+      - name: Report failure
+        if: failure()
+        run: echo "❌ Scraper failed! Check logs above."
